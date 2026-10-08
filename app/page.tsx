@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Activity, ArrowUp, ChevronDown, Clock3, Command, Copy, FilePenLine, FolderOpen, Mic, MoreHorizontal, Network, Radio, Rocket, ShieldCheck, Sparkles, Terminal, Wifi, X, User, Zap } from "lucide-react";
@@ -88,7 +90,7 @@ function HomeContent() {
     };
     void initAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
       if (session) {
         setCurrentUser({ email: session.user.email!, token: session.access_token! });
       } else {
@@ -132,10 +134,10 @@ function HomeContent() {
 
       if (data) {
         // Map Supabase conversations to Session type
-        const mappedSessions = data.map(s => ({
+        const mappedSessions = (data as any[]).map((s: any) => ({
           id: s.id,
           title: s.title,
-          timestamp: new Date(s.updated_at).getTime(),
+          timestamp: s.updated_at ? new Date(s.updated_at).getTime() : Date.now(),
           messages: [] // Loaded on demand
         }));
         setSessions(mappedSessions);
@@ -212,7 +214,7 @@ function HomeContent() {
 
       if (error) throw error;
 
-      const messages = data.map(m => ({
+      const messages = (data as any[]).map(m => ({
         role: m.sender as any,
         content: m.content,
         tool: (m.metadata as any)?.tool_name

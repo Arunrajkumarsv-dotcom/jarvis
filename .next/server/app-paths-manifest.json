@@ -1,13 +1,13 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
   "/api/agent/route": "app/api/agent/route.js",
-  "/api/auth/verify-otp/route": "app/api/auth/verify-otp/route.js",
-  "/api/health/route": "app/api/health/route.js",
-  "/api/auth/send-otp/route": "app/api/auth/send-otp/route.js",
-  "/api/feedback/route": "app/api/feedback/route.js",
-  "/api/auth/session/route": "app/api/auth/session/route.js",
   "/api/code/generate/route": "app/api/code/generate/route.js",
-  "/api/transcribe/route": "app/api/transcribe/route.js",
+  "/api/auth/send-otp/route": "app/api/auth/send-otp/route.js",
+  "/api/health/route": "app/api/health/route.js",
   "/api/chat/route": "app/api/chat/route.js",
+  "/api/auth/session/route": "app/api/auth/session/route.js",
+  "/api/auth/verify-otp/route": "app/api/auth/verify-otp/route.js",
+  "/api/transcribe/route": "app/api/transcribe/route.js",
+  "/api/feedback/route": "app/api/feedback/route.js",
   "/page": "app/page.js"
 }
