@@ -65,33 +65,6 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   type __Unused = __Check
 }
 
-// Validate ../../app/api/auth/send-otp/route.ts
-{
-  type __IsExpected<Specific extends RouteHandlerConfig<"/api/auth/send-otp">> = Specific
-  const handler = {} as typeof import("../../app/api/auth/send-otp/route.js")
-  type __Check = __IsExpected<typeof handler>
-  // @ts-ignore
-  type __Unused = __Check
-}
-
-// Validate ../../app/api/auth/session/route.ts
-{
-  type __IsExpected<Specific extends RouteHandlerConfig<"/api/auth/session">> = Specific
-  const handler = {} as typeof import("../../app/api/auth/session/route.js")
-  type __Check = __IsExpected<typeof handler>
-  // @ts-ignore
-  type __Unused = __Check
-}
-
-// Validate ../../app/api/auth/verify-otp/route.ts
-{
-  type __IsExpected<Specific extends RouteHandlerConfig<"/api/auth/verify-otp">> = Specific
-  const handler = {} as typeof import("../../app/api/auth/verify-otp/route.js")
-  type __Check = __IsExpected<typeof handler>
-  // @ts-ignore
-  type __Unused = __Check
-}
-
 // Validate ../../app/api/chat/route.ts
 {
   type __IsExpected<Specific extends RouteHandlerConfig<"/api/chat">> = Specific

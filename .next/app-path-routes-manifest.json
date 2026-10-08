@@ -1,13 +1,10 @@
 {
-  "/api/auth/verify-otp/route": "/api/auth/verify-otp",
-  "/api/health/route": "/api/health",
-  "/api/chat/route": "/api/chat",
-  "/api/auth/send-otp/route": "/api/auth/send-otp",
-  "/api/agent/route": "/api/agent",
-  "/api/code/generate/route": "/api/code/generate",
-  "/api/transcribe/route": "/api/transcribe",
-  "/api/auth/session/route": "/api/auth/session",
-  "/api/feedback/route": "/api/feedback",
   "/_not-found/page": "/_not-found",
+  "/api/agent/route": "/api/agent",
+  "/api/chat/route": "/api/chat",
+  "/api/feedback/route": "/api/feedback",
+  "/api/transcribe/route": "/api/transcribe",
+  "/api/health/route": "/api/health",
+  "/api/code/generate/route": "/api/code/generate",
   "/page": "/"
 }
