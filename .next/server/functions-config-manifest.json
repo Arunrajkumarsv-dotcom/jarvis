@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "functions": {
+    "/api/auth/session": {},
+    "/api/auth/send-otp": {},
+    "/api/auth/verify-otp": {},
+    "/api/health": {},
+    "/api/agent": {},
+    "/api/code/generate": {},
+    "/api/feedback": {},
+    "/api/chat": {},
+    "/api/transcribe": {}
+  }
+}
