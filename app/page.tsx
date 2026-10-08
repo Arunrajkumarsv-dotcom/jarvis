@@ -214,7 +214,7 @@ function HomeContent() {
 
       if (error) throw error;
 
-      const messages = (data as any[]).map(m => ({
+      const messages = (data as any[]).map((m: any) => ({
         role: m.sender as any,
         content: m.content,
         tool: (m.metadata as any)?.tool_name

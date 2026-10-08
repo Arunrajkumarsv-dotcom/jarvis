@@ -2,13 +2,13 @@
   "version": 1,
   "functions": {
     "/api/auth/session": {},
+    "/api/agent": {},
     "/api/auth/send-otp": {},
     "/api/auth/verify-otp": {},
-    "/api/agent": {},
-    "/api/code/generate": {},
+    "/api/chat": {},
     "/api/health": {},
-    "/api/feedback": {},
     "/api/transcribe": {},
-    "/api/chat": {}
+    "/api/code/generate": {},
+    "/api/feedback": {}
   }
 }
