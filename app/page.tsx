@@ -12,6 +12,7 @@ import HistorySidebar from "../components/HistorySidebar";
 import SettingsModal from "../components/SettingsModal";
 import SubscriptionModal from "../components/SubscriptionModal";
 import ErrorBoundary from "../components/ErrorBoundary";
+import { supabase } from "@/lib/supabase";
 
 type Log = { time: string; title: string; detail: string; tone: "cyan" | "violet" | "dim" };
 const initialLogs: Log[] = [
@@ -79,73 +80,149 @@ function HomeContent() {
   };
   const textForHistoryRef = useRef("");
   useEffect(() => {
-    const storedUser = window.localStorage.getItem("jarvis-current-user");
-    if (!storedUser) return;
-    try {
-      const user = JSON.parse(storedUser) as CurrentUser;
-      if (user.email && user.token) {
-        setCurrentUser(user);
+    const initAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setCurrentUser({ email: session.user.email!, token: session.access_token! });
       }
-    } catch {
-      window.localStorage.removeItem("jarvis-current-user");
-    }
+    };
+    void initAuth();
 
-    const storedProfile = window.localStorage.getItem("jarvis-user-profile");
-    if (storedProfile) {
-      try {
-        setProfile(JSON.parse(storedProfile));
-      } catch {
-        console.warn("Failed to parse stored profile");
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        setCurrentUser({ email: session.user.email!, token: session.access_token! });
+      } else {
+        setCurrentUser(null);
+        setView("landing");
       }
-    }
+    });
 
-    const storedHistory = window.localStorage.getItem("jarvis-chat-history");
-    if (storedHistory) {
-      try {
-        setSessions(JSON.parse(storedHistory));
-      } catch {
-        console.warn("Failed to parse chat history");
-      }
-    }
+    return () => subscription.unsubscribe();
   }, []);
-  const saveSession = (session: Session) => {
-    setSessions((prev) => {
-      const index = prev.findIndex((s) => s.id === session.id);
-      const next = index >= 0 ? [...prev] : [...prev, session];
-      if (index >= 0) next[index] = session;
-      window.localStorage.setItem("jarvis-chat-history", JSON.stringify(next));
-      return next;
-    });
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const fetchProfile = async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', (await supabase.auth.getUser()).data.user?.id)
+        .single();
+
+      if (data) {
+        setProfile({
+          fullName: data.username,
+          gender: 'Prefer not to say',
+          preferredVoice: 'Jarvis Classic - Male'
+        });
+      } else if (error) {
+        console.warn("Failed to fetch profile:", error);
+      }
+    };
+    void fetchProfile();
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const fetchSessions = async () => {
+      const { data, error } = await supabase
+        .from('conversations')
+        .select('*')
+        .order('updated_at', { ascending: false });
+
+      if (data) {
+        // Map Supabase conversations to Session type
+        const mappedSessions = data.map(s => ({
+          id: s.id,
+          title: s.title,
+          timestamp: new Date(s.updated_at).getTime(),
+          messages: [] // Loaded on demand
+        }));
+        setSessions(mappedSessions);
+      } else if (error) {
+        console.warn("Failed to fetch sessions:", error);
+      }
+    };
+    void fetchSessions();
+  }, [currentUser]);
+
+  const saveSession = async (session: Session) => {
+    // This is now handled by specific API calls in runCommand and createChat
   };
 
-  const createChat = () => {
-    const id = `sess-${Date.now()}`;
-    const newSession: Session = { id, title: "New Conversation", timestamp: Date.now(), messages: [] };
-    setSessions((prev) => {
-      const next = [newSession, ...prev];
-      window.localStorage.setItem("jarvis-chat-history", JSON.stringify(next));
-      return next;
-    });
-    setActiveSessionId(id);
-    setHistory([]);
-  };
+  const createChat = async () => {
+    if (!currentUser) return;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-  const deleteSession = (id: string) => {
-    setSessions((prev) => {
-      const next = prev.filter((s) => s.id !== id);
-      window.localStorage.setItem("jarvis-chat-history", JSON.stringify(next));
-      return next;
-    });
-    if (activeSessionId === id) {
-      setActiveSessionId(null);
+      const { data, error } = await supabase
+        .from('conversations')
+        .insert({ user_id: user.id, title: 'New Conversation' })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const newSession: Session = {
+        id: data.id,
+        title: data.title,
+        timestamp: data.updated_at ? new Date(data.updated_at).getTime() : Date.now(),
+        messages: []
+      };
+
+      setSessions((prev) => [newSession, ...prev]);
+      setActiveSessionId(data.id);
       setHistory([]);
+    } catch (e) {
+      console.error("Failed to create chat:", e);
+      showToast("Error initializing secure channel.");
     }
   };
 
-  const selectSession = (id: string) => {
+  const deleteSession = async (id: string) => {
+    if (!currentUser) return;
+    try {
+      const { error } = await supabase
+        .from('conversations')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setSessions((prev) => prev.filter((s) => s.id !== id));
+      if (activeSessionId === id) {
+        setActiveSessionId(null);
+        setHistory([]);
+      }
+    } catch (e) {
+      console.error("Failed to delete session:", e);
+      showToast("Failed to purge session from archives.");
+    }
+  };
+
+  const selectSession = async (id: string) => {
     setActiveSessionId(id);
-    const session = sessions.find((s) => s.id === id);
-    if (session) setHistory(session.messages);
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('conversation_id', id)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      const messages = data.map(m => ({
+        role: m.sender as any,
+        content: m.content,
+        tool: (m.metadata as any)?.tool_name
+      }));
+
+      setHistory(messages);
+    } catch (e) {
+      console.error("Failed to load messages:", e);
+      showToast("Error retrieving session data.");
+    }
   };
 
   const renderMessage = (msg: { role: "user" | "assistant" | "tool"; content: string; tool?: string }) => {
@@ -229,34 +306,42 @@ function HomeContent() {
 
   const launchConsole = () => setView(currentUser ? "hud" : "auth");
   const handleAuthSuccess = (user: CurrentUser) => {
-    window.localStorage.setItem("jarvis-current-user", JSON.stringify(user));
     setCurrentUser(user);
-    const storedProfile = window.localStorage.getItem("jarvis-user-profile");
-    if (!storedProfile) {
-      setView("profile");
-    } else {
-      try {
-        setProfile(JSON.parse(storedProfile));
-        setView("hud");
-      } catch {
-        setView("profile");
-      }
-    }
+    setView("hud");
   };
 
-  const handleProfileComplete = (profileData: any) => {
-    window.localStorage.setItem("jarvis-user-profile", JSON.stringify(profileData));
+  const handleProfileComplete = async (profileData: any) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase
+        .from('profiles')
+        .upsert({
+          id: user.id,
+          username: profileData.fullName
+        });
+    }
     setProfile(profileData);
     setView("hud");
   };
 
-  const updateProfile = (updates: any) => {
+  const updateProfile = async (updates: any) => {
     const newProfile = { ...profile, ...updates };
     setProfile(newProfile);
-    window.localStorage.setItem("jarvis-user-profile", JSON.stringify(newProfile));
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase
+        .from('profiles')
+        .update({ username: newProfile.fullName })
+        .eq('id', user.id);
+    }
   };
 
-  const logout = () => { window.localStorage.removeItem("jarvis-current-user"); setCurrentUser(null); setView("landing"); };
+  const logout = async () => {
+    await supabase.auth.signOut();
+    setCurrentUser(null);
+    setView("landing");
+  };
   useEffect(() => {
     const updateClock = () => {
       const now = new Date();
@@ -350,7 +435,7 @@ function HomeContent() {
     setAttachedFiles([]);
     transcriptRef.current = "";
 
-    // Immediately append the user message to state
+    // 1. Optimistic UI update for user message
     setHistory(prev => [...prev, { role: "user", content: text }]);
 
     setThinking(true);
@@ -358,6 +443,37 @@ function HomeContent() {
     appendLog({ time: new Date().toLocaleTimeString([], { hour12: false }), title: "Command sent", detail: text, tone: "cyan" });
 
     try {
+      // 2. Persist user message to Supabase
+      if (activeSessionId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase.from('messages').insert({
+            conversation_id: activeSessionId,
+            sender: 'user',
+            content: text,
+          });
+
+          // Update conversation title if it's the first meaningful message
+          const { data: conv } = await supabase
+            .from('conversations')
+            .select('title')
+            .eq('id', activeSessionId)
+            .single();
+
+          if (conv?.title === 'New Conversation') {
+            await supabase
+              .from('conversations')
+              .update({ title: text.slice(0, 30) + (text.length > 30 ? "..." : "") })
+              .eq('id', activeSessionId);
+
+            // Update local state for sidebar
+            setSessions(prev => prev.map(s =>
+              s.id === activeSessionId ? { ...s, title: text.slice(0, 30) + (text.length > 30 ? "..." : "") } : s
+            ));
+          }
+        }
+      }
+
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -379,28 +495,17 @@ function HomeContent() {
 
       const reply = data.reply || data.content || "Command executed successfully.";
 
-      // Append the assistant reply directly into messages state
-      setHistory(prev => {
-        const updatedHistory = [...prev, { role: "assistant" as const, content: reply }];
+      // 3. Persist assistant reply to Supabase
+      if (activeSessionId) {
+        await supabase.from('messages').insert({
+          conversation_id: activeSessionId,
+          sender: 'assistant',
+          content: reply,
+        });
+      }
 
-        // Save to session if active
-        if (activeSessionId) {
-          const session = sessions.find((s) => s.id === activeSessionId);
-          if (session) {
-            const updatedSession = {
-              ...session,
-              messages: updatedHistory,
-              timestamp: Date.now(),
-              title: session.title === "New Conversation" ? (text.slice(0, 30) + (text.length > 30 ? "..." : "")) : session.title,
-            };
-            saveSession(updatedSession);
-          }
-        }
+      setHistory(prev => [...prev, { role: "assistant" as const, content: reply }]);
 
-        return updatedHistory;
-      });
-
-      // Maintain existing side effects: speech and artifacts
       handleAgentReply(reply);
 
     } catch (error) {
